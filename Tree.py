@@ -1,4 +1,4 @@
-from random import randint, sample, seed, uniform, sample
+from random import randint, sample, seed, uniform, sample, shuffle
 import tkinter
 from Node import Gate, Node
 
@@ -24,42 +24,86 @@ class Tree:
         for n in range(num_inputs):
             self.layers[0].append(Node(Gate.INPUT, row=0, col=n + 2))  # create input nodes
 
-        # setup middle layers
-        if t1 is not None and t2 is not None:  # If there are two parents, then combine them to create this tree
-            self.gen_middle_breed(t1, t2)
-        else:  # if parents are not provided, then randomly generate the middle layer
-            self.gen_middle_rand()
 
-        # setup output layers
-        self.layers[num_levels - 1] = []  # reinit this because output length may not be the same as the width
-        for n in range(num_outputs):
-            self.layers[num_levels - 1].append(
-                Node(Gate.OUTPUT, parents=self.assign_parents(num_levels - 1, 1), row=num_levels - 1, col=n))
+        if t1 is not None and t2 is not None:
+            self.layers[num_levels - 1] = [None] * num_outputs  # reinit this because output length may not be the same as the width
+            out_list = list(range(num_outputs))
+            shuffle(out_list)
+            for n in out_list:  # randomize order the output subcircuits are copied in
+                p_choice = sample([t1,t2], 1)[0]
+                self.gen_node_breed(num_levels - 1, n, p_choice)
 
-    def gen_middle_breed(self, t1, t2):
-        for row in range(1, self.num_levels - 1):  # iterate through middle layers (gate layers)
-            for col in range(self.width):
-                # three possibilities - parent a, parent b, random, 45,45,10
-                r_num = uniform(0, 1)
-                n_type = Gate.NONE
-                if r_num <= 0.35:  # get parent 1 type at the same location
-                    n_type = t1.layers[row][col].type
-                elif r_num > 0.35 and r_num <= 0.70:  # get parent 2 type at the same location
-                    n_type = t2.layers[row][col].type
-                else:  # random type
-                    n_type = Gate.get_random_gate()
+            for r in range(randint(0,10)):
+                self.mutate()
 
-                temp_node = Node(n_type, self.assign_parents(row, Gate.gate_inputs[n_type]), row=row, col=col)
-                self.layers[row][col] = temp_node
+        #if not crossbreeding then randomly generate the middle and output layers
+        else:
+            # setup output and middle layers recursively
+            self.layers[num_levels - 1] = [None] * num_outputs  # reinit this because output length may not be the same as the width
+            for n in range(num_outputs):
+                self.gen_node(num_levels-1, n, gate_type=Gate.OUTPUT)
 
-    def gen_middle_rand(self):
-        # setup the mid layers
-        for row in range(1, self.num_levels - 1):  # iterate through all middle layers
-            for col in range(self.width):
-                n_type = Gate.get_random_gate()  # assign a random gate type
-                temp_node = Node(n_type, self.assign_parents(row, Gate.gate_inputs[n_type]), row=row,
-                                 col=col)  # assign random parents based on gate type
-                self.layers[row][col] = temp_node  # put the node in the tree
+
+    #recursively generate a tree to represent the circuit
+    #should update self.layers. No return. Should be called explicitly on all output nodes
+    def gen_node(self, row, col, gate_type=None):
+        if row == 0: #hit an input node so stop
+            return
+
+        else: #if not an input node then need to generate a new node
+            if gate_type is None: #get a random gate type not or maj
+                gate_type = Gate.get_random_gate()
+
+            parents = []
+            for x in range(Gate.gate_inputs[gate_type]): #find the right number of parents
+                available_rows = range(row)
+                p_r = sample(available_rows, 1)[0]
+
+                available_cols = range(len(self.layers[p_r]))
+                p_c = sample(available_cols,1)[0]
+
+                if self.layers[p_r][p_c] == None: #if the chosen parent hasn't been generated then generate the parent
+                    self.gen_node(p_r, p_c)
+
+                parents.append(self.layers[p_r][p_c]) #once generated add to parent list
+
+            self.layers[row][col] = Node(gate_type, parents=parents, row=row, col=col)  #once enough parents are made, generate this node
+
+    #basically the same as gen_node but copys the genetic_parent's gate types and connections
+    def gen_node_breed(self, row, col, genetic_parent):
+        if row == 0:
+            return
+
+        gate_type = genetic_parent.layers[row][col].type #set this gate's type
+        parents = []
+        for p in genetic_parent.layers[row][col].parents: #iterate through the input connections (parents). should follow the same as the genetic parent
+            if self.layers[p.row][p.col] == None: #if the node hasn't been setup yet then generate it
+                self.gen_node_breed(p.row, p.col, genetic_parent)
+
+            parents.append(self.layers[p.row][p.col])
+
+        self.layers[row][col] = Node(gate_type, parents=parents, row=row, col=col)
+
+    def mutate(self):
+        #gate wise mutations
+        #flatten layers to make it easy to get random nodes
+        flat_layers = []
+        for r in self.layers[1:]:
+            for n in r:
+                if n is not None:
+                    flat_layers.append(n)
+
+        m_gate = sample(flat_layers,1)[0]
+
+        available_rows = range(m_gate.row)
+        r = sample(available_rows, 1)[0]
+
+        available_cols = range(len(self.layers[r]))
+        c = sample(available_cols, 1)[0]
+        self.gen_node(r, c)
+
+        m_gate.parents[randint(0,len(m_gate.parents)-1)] = self.layers[r][c]
+
 
     def __str__(self):
         type_map = {Gate.INPUT: "I", Gate.OUTPUT: "O", Gate.MAJORITY: "M", Gate.NOT: "N",
@@ -84,39 +128,23 @@ class Tree:
         for row in range(1, len(self.layers)):
             for col in range(len(self.layers[row])):
                 node = self.layers[row][col]
-                node.set_output(None)
+                if node is not None:
+                    node.set_output(None)
 
-    # returns an array of node references that are above the current node in the tree
-    def assign_parents(self, row, num_parents):
-        if num_parents == 0:  # handle case for none gates
-            return None
 
-        # determine gate locations above the current one for potential parents
-        available_rows = range(row)
+    # returns a random node that is above the row
+    def get_random_parent(self, row):
+        # determine gate locations above the current one for potential parent
+        p = None
+        while p is None:
 
-        parents = []
-        count = 0
-        while count < num_parents:  # choose parents that are not None type
-
+            available_rows = range(row)
             r = sample(available_rows, 1)[0]
 
             available_cols = range(len(self.layers[r]))
             c = sample(available_cols, 1)[0]
-
-            if self.layers[r][c].type != Gate.NONE:  # make sure chosen parent exists otherwise find another
-                parents.append(self.layers[r][c])
-                count += 1
-            else:
-                # parents.append(self.layers[0][0]) #give it default zero for now. might want to explore other behavior. *this performs worse for accuracy than just retrying another random parent
-                # count+=1
-                continue
-
-        return parents
-
-    #remove unused nodes in the tree
-    def prune_tree(self):
-        pass
-
+            p = self.layers[r][c]
+        return p
 
     def calculate(self, input_values):
         if len(input_values) != len(self.layers[0]) - 2:
@@ -170,3 +198,22 @@ class Tree:
             self.draw_tree(output_node, canvas)
 
         root.mainloop()
+
+    """ 
+    def equal_helper(self, other_node):    
+        if other_node.row == 0:
+            return True
+        
+        if other_node.type is not self.layers[other_node.row][other_node.col].type:
+            return False
+        
+        for other_p in other_node.parents:
+            if
+            
+    
+    def __eq__(self, other):
+        for o in self.layers[-1]: #iterate through output layers
+            if self.equal_helper(other.layers[self.layers-1][0]) == False:
+                return False
+        return True
+    """

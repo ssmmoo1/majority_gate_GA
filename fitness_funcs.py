@@ -116,13 +116,25 @@ def score_tree_2bit_add(tree):
             False, False,False, True,   False, True,  True,  True,   True,  True,  True,  True,   True,  True,  True,  True] #cout
 
     num_correct = 0
+    output_subscores = [0,0,0]
     for x in range(len(in1)):
         tree.reset()
         outputs = tree.calculate([in1[x], in2[x], in3[x], in4[x], in5[x]])
-        if outputs[0] == out1[x] and outputs[1] == out2[x] and outputs[2] == out3[x]:
-            num_correct += 1
 
-    tree.score = num_correct / len(in1)
+        if outputs[0] ==out1[x]:
+            num_correct+=1
+            output_subscores[0]+=1
+
+        if outputs[1] == out2[x]:
+            num_correct+=1
+            output_subscores[1]+=1
+
+        if outputs[2] == out3[x]:
+            num_correct+=1
+            output_subscores[2]+=1
+
+
+    tree.score = num_correct / (len(in1) * 3)
     return tree.score
 score_tree_2bit_add.inputs = 5
 score_tree_2bit_add.outputs = 3

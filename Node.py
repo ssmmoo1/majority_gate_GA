@@ -15,7 +15,7 @@ class Gate():
 
     @staticmethod
     def get_random_gate():
-        choices = [Gate.MAJORITY, Gate.NOT, Gate.NONE]
+        choices = [Gate.MAJORITY, Gate.NOT]
         return sample(choices,1)[0]
 
 

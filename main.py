@@ -47,9 +47,9 @@ def run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_
         best = population[0:reserve_size]
         reserve = population[0:reserve_size]
         generation_count += 1
-        #print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
-        #print(f"Average Fitness: {avg_fitness}")
-        #print(f"Time taken: {time() - start_time}")
+        print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
+        print(f"Average Fitness: {avg_fitness}")
+        print(f"Time taken: {time() - start_time}")
 
     fitness_f(best[0])
     return best[0]
@@ -97,9 +97,9 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
         best = population[0:reserve_size]
         reserve = population[0:reserve_size]
         generation_count += 1
-        #print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
-        #print(f"Average Fitness: {avg_fitness}")
-        #print(f"Time taken: {time() - start_time}")
+        print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
+        print(f"Average Fitness: {avg_fitness}")
+        print(f"Time taken: {time() - start_time}")
 
     pool.close()
     fitness_f(best[0])
@@ -116,13 +116,13 @@ def random_search(fitness_f, num_levels, width, inputs, outputs):
         if fit > max_score:
             max_score = fit
         num_searched += 1
-        #if num_searched % 300 == 0:
-            #print(f"Searched: {num_searched}, Max score: {max_score}")
+        if num_searched % 500 == 0:
+            print(f"Searched: {num_searched}, Max score: {max_score}")
     return tree
 
 
 def compare_methods():
-    fitness_f = score_tree_ha
+    fitness_f = score_tree_xor
     inputs = fitness_f.inputs  # look at fitness function to determine inputs
     outputs = fitness_f.outputs  # look at  determine outputs
     num_levels = 5
@@ -136,33 +136,33 @@ def compare_methods():
     start_time = time()
     for x in range(run_for):
         run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
-    print(f"Average Time GA non mp 100 trials: {(time() - start_time) / run_for}")
+        print("Finished {x}")
+    print(f"Average Time GA non mp {run_for} trials: {(time() - start_time) / run_for}")
 
     start_time = time()
     for x in range(run_for):
         random_search(fitness_f, num_levels, width, inputs, outputs)
-    print(f"Average Time Random Search 100 trials: {(time() - start_time) / run_for}")
+        print("Finished {x}")
+    print(f"Average Time Random Search {run_for} trials: {(time() - start_time) / run_for}")
 
 def run_search():
-    fitness_f = score_tree_xor
+    fitness_f = score_tree_2bit_add
     inputs = fitness_f.inputs  # look at fitness function to determine inputs
     outputs = fitness_f.outputs  # look at  determine outputs
-    num_levels = 5
-    width = 5
+    num_levels = 15
+    width = 15
 
-    pop_size = 300
-    reserve_size = 30
-
-    start_time = time()
-    best_tree = run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
-    print(f"Total time taken: {time() - start_time}")
+    pop_size = 1000
+    reserve_size = 100
 
     start_time = time()
-    best_tree = random_search(fitness_f, num_levels, width, inputs, outputs)
+    #best_tree = random_search(fitness_f, num_levels, width, inputs, outputs)
+    best_tree = run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
     print(f"Total time taken: {time() - start_time}")
-
-    # best_tree.visualize_tree()
+    print(best_tree)
+    best_tree.visualize_tree()
 
 
 if __name__ == "__main__":
-   compare_methods()
+    #compare_methods()
+    run_search()
