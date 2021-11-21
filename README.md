@@ -19,4 +19,4 @@ Random: 33.421s
 
 HA - averaged over 10 solutions  
 GA: 228.544s   
-Random Search:   
+Random Search: 237.911s
