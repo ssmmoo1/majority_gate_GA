@@ -60,13 +60,18 @@ def score_tree_ha(tree):
     out2 = [False, False, False, True] #carry
 
     num_correct = 0
+    output_subscores = [0,0]
     for x in range(len(in1)):
         tree.reset()
         outputs = tree.calculate([in1[x], in2[x]])
-        if outputs[0] == out1[x] and outputs[1] == out2[x]:
+        if outputs[0] == out1[x]:
             num_correct+=1
+            output_subscores[0]+=1
+        if outputs[1] == out2[x]:
+            num_correct+=1
+            output_subscores[1]+=1
 
-    tree.score = num_correct/len(in1)
+    tree.score = num_correct/(len(in1) * 2)
     return tree.score
 score_tree_ha.inputs = 2
 score_tree_ha.outputs = 2
@@ -80,13 +85,18 @@ def score_tree_fa(tree):
     out2 = [False, False, False, True, False, True, True, True] #carry
 
     num_correct = 0
+    output_subscores = [0,0]
     for x in range(len(in1)):
         tree.reset()
         outputs = tree.calculate([in1[x], in2[x], in3[x]])
-        if outputs[0] == out1[x] and outputs[1] == out2[x]:
+        if outputs[0] == out1[x]:
             num_correct+=1
+            output_subscores[0]+=1
+        if outputs[1] == out2[x]:
+            num_correct+=1
+            output_subscores[1]+=1
 
-    tree.score = num_correct/len(in1)
+    tree.score = num_correct/(len(in1) * 2)
     return tree.score
 score_tree_fa.inputs = 3
 score_tree_fa.outputs = 2

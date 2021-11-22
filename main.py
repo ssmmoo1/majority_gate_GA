@@ -17,6 +17,7 @@ accuracy_dist = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0}
 
 def run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_size=10):
     max_score = 0
+    num_searched = 0
 
     best = [None]
     reserve = []
@@ -41,7 +42,7 @@ def run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_
                 max_score = score
 
             #print(population[p])
-
+        num_searched += len(population)
         avg_fitness = avg_fitness / len(population)
         population.sort(key=lambda x: x.score, reverse=True)
         best = population[0:reserve_size]
@@ -50,15 +51,17 @@ def run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_
         print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
         print(f"Average Fitness: {avg_fitness}")
         print(f"Time taken: {time() - start_time}")
+        print(f"Number of circuits searched {num_searched}")
 
     fitness_f(best[0])
-    return best[0]
+    return best[0], num_searched
 
 
 def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_size=10):
     pool = Pool(processes=cpu_count())
 
     max_score = 0
+    num_searched = 0
 
     best = [None]
     reserve = []
@@ -87,7 +90,7 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
         fitness_results = pool.map(fitness_f, population)
         avg_fitness = sum(fitness_results)
         avg_fitness = avg_fitness / len(population)
-
+        num_searched += len(population)
         for y in range(len(fitness_results)):
             population[y].score = fitness_results[y]
 
@@ -100,6 +103,7 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
         print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
         print(f"Average Fitness: {avg_fitness}")
         print(f"Time taken: {time() - start_time}")
+        print(f"Number of circuits searched {num_searched}")
 
     pool.close()
     fitness_f(best[0])
@@ -118,10 +122,40 @@ def random_search(fitness_f, num_levels, width, inputs, outputs):
         num_searched += 1
         if num_searched % 500 == 0:
             print(f"Searched: {num_searched}, Max score: {max_score}")
-    return tree
+    return tree, num_searched
 
 
 def compare_methods():
+    fitness_f = score_tree_fa
+    inputs = fitness_f.inputs  # look at fitness function to determine inputs
+    outputs = fitness_f.outputs  # look at  determine outputs
+    num_levels = 7
+    width = 7
+
+    pop_size = 1000
+    reserve_size = 100
+
+    run_for = 10
+
+    start_time = time()
+    circuits_searched = 0
+    for x in range(run_for):
+        best_tree, num_searched = run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
+        print(f"Finished {x}")
+        circuits_searched+=num_searched
+    print(f"Average Time GA non mp {run_for} trials: {(time() - start_time) / run_for}")
+    print(f"Average number of ciruits searched {circuits_searched/run_for}")
+
+    start_time = time()
+    circuits_searched = 0
+    for x in range(run_for):
+        best_tree, num_searched = random_search(fitness_f, num_levels, width, inputs, outputs)
+        print(f"Finished {x}")
+        circuits_searched += num_searched
+    print(f"Average Time Random Search {run_for} trials: {(time() - start_time) / run_for}")
+    print(f"Average number of ciruits searched {circuits_searched / run_for}")
+
+def run_search():
     fitness_f = score_tree_xor
     inputs = fitness_f.inputs  # look at fitness function to determine inputs
     outputs = fitness_f.outputs  # look at  determine outputs
@@ -130,30 +164,6 @@ def compare_methods():
 
     pop_size = 300
     reserve_size = 30
-
-    run_for = 10
-
-    start_time = time()
-    for x in range(run_for):
-        run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
-        print("Finished {x}")
-    print(f"Average Time GA non mp {run_for} trials: {(time() - start_time) / run_for}")
-
-    start_time = time()
-    for x in range(run_for):
-        random_search(fitness_f, num_levels, width, inputs, outputs)
-        print("Finished {x}")
-    print(f"Average Time Random Search {run_for} trials: {(time() - start_time) / run_for}")
-
-def run_search():
-    fitness_f = score_tree_2bit_add
-    inputs = fitness_f.inputs  # look at fitness function to determine inputs
-    outputs = fitness_f.outputs  # look at  determine outputs
-    num_levels = 15
-    width = 15
-
-    pop_size = 1000
-    reserve_size = 100
 
     start_time = time()
     #best_tree = random_search(fitness_f, num_levels, width, inputs, outputs)
@@ -164,5 +174,5 @@ def run_search():
 
 
 if __name__ == "__main__":
-    #compare_methods()
-    run_search()
+    compare_methods()
+    #run_search()
