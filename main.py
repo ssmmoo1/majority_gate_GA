@@ -1,4 +1,4 @@
-from random import sample
+from random import sample, choices
 from time import time
 from Tree import Tree
 from fitness_funcs import *
@@ -36,7 +36,9 @@ def run_ga(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reserve_
 
 
         for p in range(len(population)):
-            score = fitness_f(population[p])
+            score, subscore = fitness_f(population[p])
+            population[p].score = score
+            population[p].subscore = subscore
             avg_fitness+=score
             if score > max_score:
                 max_score = score
@@ -66,14 +68,20 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
     best = [None]
     reserve = []
     generation_count = 0
+    #while generation_count < 2000:
     while max_score < 1:
         start_time = time()
         population = []
         population += reserve
         avg_fitness = 0
         for x in range(pop_size):
-            p1 = sample(best, 1)[0]
-            p2 = sample(best, 1)[0]
+            #p1 = sample(best, 1)[0]
+            #p2 = sample(best, 1)[0]
+
+            probs = list(range(1,pop_size+1)).reverse()
+            p1 = choices(best, weights=probs, k=1)[0]
+            p2 = choices(best, weights=probs, k=1)[0]
+
             population.append(Tree(inputs, outputs, t1=p1, t2=p2, num_levels=num_levels, width=width))
         for x in range(pop_size // 10):  # keep introducing new ones
             population.append(Tree(inputs, outputs, num_levels=num_levels, width=width))
@@ -88,11 +96,18 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
             #print(population[p])
         """
         fitness_results = pool.map(fitness_f, population)
+        unzipped_results = list(zip(*fitness_results))
+        fitness_results = unzipped_results[0]
+        subscores = unzipped_results[1]
+        #print(fitness_results)
+        #print(subscores)
+
         avg_fitness = sum(fitness_results)
         avg_fitness = avg_fitness / len(population)
         num_searched += len(population)
         for y in range(len(fitness_results)):
             population[y].score = fitness_results[y]
+            population[y].subscores = subscores[y]
 
         population.sort(key=lambda x: x.score, reverse=True)
         if population[0].score > max_score:
@@ -101,13 +116,14 @@ def run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=100, reser
         reserve = population[0:reserve_size]
         generation_count += 1
         print(f"Current Generation:{generation_count}, best accuracy:{max_score}, best tree: \n{best[0]} ")
+        print(f"Number of gates: {best[0].get_num_gates()}, Crit Path: {best[0].get_crit_path()}")
         print(f"Average Fitness: {avg_fitness}")
         print(f"Time taken: {time() - start_time}")
         print(f"Number of circuits searched {num_searched}")
 
     pool.close()
     fitness_f(best[0])
-    return best[0]
+    return best[0], num_searched
 
 
 def random_search(fitness_f, num_levels, width, inputs, outputs):
@@ -132,8 +148,8 @@ def compare_methods():
     num_levels = 7
     width = 7
 
-    pop_size = 1000
-    reserve_size = 100
+    pop_size = 3000
+    reserve_size = 300
 
     run_for = 10
 
@@ -156,23 +172,49 @@ def compare_methods():
     print(f"Average number of ciruits searched {circuits_searched / run_for}")
 
 def run_search():
+    fitness_f = score_tree_4bit_add
+    inputs = fitness_f.inputs  # look at fitness function to determine inputs
+    outputs = fitness_f.outputs  # look at  determine outputs
+    num_levels = 30
+    width = 30
+
+    pop_size = 5000
+    reserve_size = 500
+
+    start_time = time()
+    #best_tree = random_search(fitness_f, num_levels, width, inputs, outputs)
+    best_tree = run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
+    best_tree = best_tree[0] #first element is the object
+    print(f"Total time taken: {time() - start_time}")
+    print(best_tree)
+    with open("4bit_adder.pkl", "wb+") as f:
+        pickle.dump(best_tree, f)
+    best_tree.visualize_tree()
+
+
+def average_search():
     fitness_f = score_tree_xor
     inputs = fitness_f.inputs  # look at fitness function to determine inputs
     outputs = fitness_f.outputs  # look at  determine outputs
     num_levels = 5
     width = 5
 
-    pop_size = 300
-    reserve_size = 30
+    pop_size = 500
+    reserve_size = 50
 
+    run_for = 10
     start_time = time()
-    #best_tree = random_search(fitness_f, num_levels, width, inputs, outputs)
-    best_tree = run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
-    print(f"Total time taken: {time() - start_time}")
-    print(best_tree)
-    best_tree.visualize_tree()
+    circuits_searched = 0
+    for x in range(run_for):
+        best_tree, num_searched = run_ga_mp(fitness_f, num_levels, width, inputs, outputs, pop_size=pop_size, reserve_size=reserve_size)
+        print(f"Finished {x}")
+        circuits_searched += num_searched
+    print(f"Average Time Random Search {run_for} trials: {(time() - start_time) / run_for}")
+    print(f"Average number of ciruits searched {circuits_searched / run_for}")
+
 
 
 if __name__ == "__main__":
-    compare_methods()
-    #run_search()
+    #compare_methods()
+    run_search()
+    #average_search()

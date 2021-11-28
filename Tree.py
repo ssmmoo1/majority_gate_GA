@@ -1,4 +1,4 @@
-from random import randint, sample, seed, uniform, sample, shuffle
+from random import randint, sample, seed, uniform, sample, shuffle, triangular
 import tkinter
 from Node import Gate, Node
 
@@ -13,6 +13,7 @@ class Tree:
         self.width = width  # the number of gates allowed in each level
 
         self.score = 0  # the initial fitness score
+        self.subscores = None
 
         assert (self.num_levels >= 3), "Must have at least 3 levels"  # 1 inputs, 1 gate, 1 output
 
@@ -31,10 +32,30 @@ class Tree:
             shuffle(out_list)
             for n in out_list:  # randomize order the output subcircuits are copied in
                 p_choice = sample([t1,t2], 1)[0]
+                #p_choice = None
+                #smaller = t1 if t1.subscores[n] < t2.subscores[n] else t2
+                #larger = t1 if t1.subscores[n] >= t2.subscores[n] else t2
+                #r_num = uniform(0,1)
+                #cutoff = 1 / ( (larger.subscores[n] / smaller.subscores[n]) + 1)
+                #p_choice = smaller if r_num < cutoff else larger
+
                 self.gen_node_breed(num_levels - 1, n, p_choice)
 
-            for r in range(randint(0,10)):
-                self.mutate()
+
+            num_gates = 0
+            for r in self.layers:
+                for n in r:
+                    if n is not None:
+                        num_gates+=1
+
+            num_gates = int(triangular(0, num_gates, num_gates / 10))
+            for r in range(randint(0,int(num_gates*0.2))):
+                flip = randint(0,1)
+                if flip == 1:
+                    self.mutate()
+                else:
+                    self.remove_gate()
+            #self.prune_tree()
 
         #if not crossbreeding then randomly generate the middle and output layers
         else:
@@ -105,6 +126,84 @@ class Tree:
         m_gate.parents[randint(0,len(m_gate.parents)-1)] = self.layers[r][c]
 
 
+    def mutate_connection(self):
+        #choose random node
+
+        #get nodes parent
+
+        #insert a node at the row above chosen node
+
+        #change parent to the new node
+
+        #add original parent as a parent of the new node
+
+        #fill in addition parents for the new node if needed (only for majority gate)
+        pass
+
+    def get_open_col(self, row):
+        for col in range(len(self.layers[row])):
+            if self.layers[row][col] == None:
+                return col
+
+        return None
+
+    def remove_gate(self):
+        #choose a random node
+
+
+        available_rows = range(1,self.num_levels-1)
+        r = sample(available_rows, 1)[0]
+
+        available_cols = range(len(self.layers[r]))
+        c = sample(available_cols, 1)[0]
+        node = self.layers[r][c]
+        if node is None:
+            return
+        #get its children
+        children = []
+        for r in self.layers[1:]:
+            for c_node in r:
+                if c_node is not None:
+                    if node in c_node.parents:
+                        children.append(c_node)
+
+        #give all children the parent of the this nodes input
+
+        for c in children:
+            new_p = sample(node.parents, 1)[0]
+            i = c.parents.index(node)
+            c.parents[i] = new_p
+
+        #remove node from 2d array
+        self.layers[node.row][node.col] = None
+
+
+    def prune_tree_helper(self, node):
+        self.used_spots[node.row][node.col] = True
+        if node.type == Gate.INPUT:
+            return
+        else:
+            for p in node.parents:
+                self.prune_tree_helper(p)
+
+    def prune_tree(self):
+        #removes nodes that are not in an output path
+        self.used_spots = [[False for col in range(self.width)] for row in range(self.num_levels)]
+        for c in range(len(self.layers[0])):
+            self.used_spots[0][c] = True
+
+        for node in self.layers[-1]:
+            self.prune_tree_helper(node)
+
+
+        for r in range(len(self.layers)):
+            for c in range(len(self.layers[r])):
+                if self.used_spots[r][c] == False:
+                    self.layers[r][c] = None
+
+        #print(self)
+
+
     def __str__(self):
         type_map = {Gate.INPUT: "I", Gate.OUTPUT: "O", Gate.MAJORITY: "M", Gate.NOT: "N",
                     Gate.NONE: "-"}
@@ -164,8 +263,8 @@ class Tree:
         gate_colors = {Gate.MAJORITY: "#9fe2bf", Gate.NOT: "#de3163", Gate.NONE: "#ffffff",
                        Gate.OUTPUT: "#a569bd",
                        Gate.INPUT: "#a569bd"}  # define how many inputs each gate type has
-        size = 30
-        space = 6  # multiple of size
+        size = 20
+        space = 3  # multiple of size
         start_offset = 5
 
         x_val = (current_node.col * size * space) + (size + start_offset)
@@ -189,7 +288,7 @@ class Tree:
         root = tkinter.Tk()
 
         # create canvas
-        canvas = tkinter.Canvas(root, bg="white", height=1500, width=1500)
+        canvas = tkinter.Canvas(root, bg="white", height=1500, width=2000)
 
         # add to window and show
         canvas.pack()
@@ -198,6 +297,35 @@ class Tree:
             self.draw_tree(output_node, canvas)
 
         root.mainloop()
+
+
+
+    def get_num_gates(self):
+        g_count  = 0
+        for r in self.layers[1:-1]:
+            for n in r:
+                if n is not None:
+                    g_count+=1
+        return g_count
+
+
+    def crit_path_helper(self, node, current_max):
+        if node.type == Gate.INPUT:
+            if current_max > self.crit_path:
+                self.crit_path = current_max
+            return
+
+        for p in node.parents:
+            self.crit_path_helper(p, current_max+1)
+
+
+    def get_crit_path(self):
+        self.crit_path = 0
+        for node in self.layers[self.num_levels-1]:
+            self.crit_path_helper(node, -1)
+
+        return self.crit_path
+
 
     """ 
     def equal_helper(self, other_node):    
